@@ -12,10 +12,6 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f back/src/db/migrations/005_remove_sch
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f back/src/db/migrations/006_monthly_schedule.sql
 ```
 
-微信聊天命令沿用原仓库实现：`/auth` 查询已有微信账号的成员身份并更新菜单；`/deauth` 移除微信菜单标签、恢复默认菜单。两条命令均不修改 OpenID 与工号的绑定，也不改变成员权限。
-
-排班不发送微信通知。组长在换班大厅查看和确认请求，蹭班仍按原权限直接添加。迁移 003 保留为历史记录；迁移 005 删除排班通知队列、模板读取函数和排班模板配置，不影响原有工单通知。
-
 新数据库先按现有初始化流程建立 `data`、`wts`、`scheduler` schema 和 `app` 角色，再执行上述迁移。
 迁移在一个事务中创建表、索引和权限。重复执行会报错，已执行成功的数据库不要再次运行。
 迁移只调整排班结构，不导入图片中的姓名，不修改任何成员权限。
@@ -43,7 +39,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f back/src/db/migrations/006_monthly_sc
 | 确认/拒绝换班 | 禁止 | 对应日期的值班组长 | 禁止代替组长确认 |
 
 值班组长必须是当前 `group-leader`；真实成员工号用于排班，系统特殊工号 `-1`、`-2` 禁止参与。
-片区负责人是当天的职责标记，不会授予管理员权限。图例背景为组长橙、API/dev 浅蓝、负责人黄、正式成员绿、实习成员白、科长蓝；同时显示文字标签。
+。
 
 ## 业务规则
 
@@ -98,13 +94,4 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f back/src/db/migrations/006_monthly_sc
 换班状态：`open`（待接单）、`pending`（已接单待组长确认）、`approved`、`rejected`、`canceled`、`stale`。
 版本号使用服务器返回值，不假设首次创建的具体版本。
 
-## 验证
 
-常规后端检查：在 `back/src` 执行 `go test ./...`。
-独立数据库测试脚本 `back/scripts/test-scheduler.mjs` 使用临时目录、随机本机端口和专用 `wts_scheduler_test` 数据库。
-它会执行原始初始化脚本、排班迁移，并以 `app` 用户测试真实查询、权限与双组长换班。
-需在独立临时目录安装 `embedded-postgres`，通过 `EMBEDDED_POSTGRES_MODULE` 指定其 `dist/index.js`；可用 `GO_BINARY` 指定 Go。
-脚本结束时停止数据库，保留临时数据便于诊断。测试代码拒绝非本机或非专用测试数据库，禁止指向生产环境。
-
-前端在 `front` 执行 `npm run check` 和 `npm run test:e2e -- e2e/scheduler.test.ts`。
-浏览器测试拦截所有 API，不访问真实后端，验证日历标记、角色界面、预览不自动保存、换班确认和图例底色。
